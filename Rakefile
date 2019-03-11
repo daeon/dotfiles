@@ -18,8 +18,9 @@ task :install => [:submodule_init, :submodules] do
   install_files(Dir.glob('irb/*')) if want_to_install?('irb/pry configs (more colorful)')
   install_files(Dir.glob('ruby/*')) if want_to_install?('rubygems config (faster/no docs)')
   install_files(Dir.glob('ctags/*')) if want_to_install?('ctags config (better js/ruby support)')
-  install_files(Dir.glob('tmux/*')) if want_to_install?('tmux config')
+  #install_files(Dir.glob('tmux/*')) if want_to_install?('tmux config')
   install_files(Dir.glob('vimify/*')) if want_to_install?('vimification of command line tools')
+  install_tmux if want_to_install?('tmux config')
   if want_to_install?('vim configuration (highly recommended)')
     install_files(Dir.glob('{vim,vimrc}'))
     Rake::Task["install_vundle"].execute
@@ -177,6 +178,16 @@ def install_homebrew
   puts
   puts
 end
+
+def install_tmux
+  puts "======================================================"
+  puts "Installing tmux settings"
+  puts "======================================================"
+  run %{ ln -nfs "$HOME/.yadr/tmux" "$HOME/.tmux" }
+  run %{ ln -nfs "$HOME/.yadr/tmux/tmux.conf" "$HOME/.tmux.conf" }
+  puts
+end
+
 
 def install_fonts
   puts "======================================================"

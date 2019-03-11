@@ -1,0 +1,221 @@
+
+### Segment drawing
+# A few utility functions to make it easy and re-usable to draw segmented prompts
+
+CURRENT_BG='NONE'
+CURRENT_BG_R='NONE'
+SEGMENT_SEPARATOR=''
+SEGMENT_SEPARATOR_R=''
+ALT_SEGMENT_SEPARATOR=''
+ALT_RSEGMENT_SEPARATOR_R=''
+
+COLORS=(
+      "240"  # 1 Dark Grey
+      "245"  # 2 Grey
+      "250"  # 3 Light Grey
+      "166"  # 4 Orange
+      "220"  # 5 Yellow
+      "31"   # 6 Blue
+      "255"  # 7 White
+      "238"  # 8 Darker Grey
+    )
+
+# Begin a segment
+# Takes two arguments, background and foreground. Both can be omitted,
+# rendering default background/foreground.
+prompt_segment() {
+  local bg fg
+  if [[ -n $1 && $1 == r ]]
+  then
+    shift
+    rprompt_segment $@
+    return
+  fi
+  [[ -n $1 ]] && bg="%K{$1}" || bg="%k"
+  [[ -n $2 ]] && fg="%F{$2}" || fg="%f"
+  if [[ $CURRENT_BG != 'NONE' && $1 != $CURRENT_BG ]]; then
+    echo -n " %{$bg%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR%{$fg%} "
+  else
+    echo -n "%{$bg%}%{$fg%} "
+  fi
+  CURRENT_BG=$1
+  [[ -n $3 ]] && echo -n $3
+}
+
+# Begin a segment for the RPROMPT
+# Takes two arguments, background and foreground. Both can be omitted,
+# rendering default background/foreground.
+rprompt_segment() {
+  local bg fg
+  [[ -n $1 ]] && bg="%K{$1}" || bg="%k"
+  [[ -n $2 ]] && fg="%F{$2}" || fg="%f"
+  echo -n " %{%K{$CURRENT_BG_R}%F{$1}%}$SEGMENT_SEPARATOR_R%{$bg$fg%} "
+  CURRENT_BG_R=$1
+  [[ -n $3 ]] && echo -n $3
+}
+
+
+# End the prompt, closing any open segments
+prompt_end() {
+  local SEP
+  if [[ -n $CURRENT_BG ]]; then
+    echo -n " %{%k%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR"
+  else
+    echo -n "%{%k%}"
+  fi
+  echo -n "%{%f%}"
+  CURRENT_BG=''
+}
+
+prompt_host() {
+  prompt_segment $COLORS[4] $COLORS[5] "%m"
+}
+
+prompt_user() {
+  prompt_segment $COLORS[6] $COLORS[7] "%B$USER%b"
+}
+
+function +vi-git-st() {
+    local ahead behind
+    local -a gitstatus
+    local -a stashes
+    ahead=$(git rev-list ${hook_com[branch]}@{upstream}..HEAD 2>/dev/null | wc -l)
+    (( $ahead )) && gitstatus+=( "↑${ahead}" )
+    behind=$(git rev-list HEAD..${hook_com[branch]}@{upstream} 2>/dev/null | wc -l)
+    (( $behind )) && gitstatus+=( "↓${behind}" )
+
+    hook_com[misc]+="${(j:/:)gitstatus}"
+
+    if [[ -s ${hook_com[base]}/.git/refs/stash ]] ; then
+    #if [[ -s $(git rev-parse --git-dir)/refs/stash ]] ; then
+        stashes=$(git stash list 2>/dev/null | wc -l)
+        hook_com[misc]+="☰ ${stashes}"
+    fi
+}
+
+prompt_vcs() {
+    [[ -n ${vcs_info_msg_0_} ]] && prompt_segment $1 "$COLORS[8]" "$COLORS[2]" ${vcs_info_msg_0_}
+}
+
+prompt_git() {
+    [[ -n $git_info[prompt] ]] && prompt_segment $1 "$COLORS[8]" "$COLORS[2]" "$git_info[prompt]"
+}
+
+
+# Dir: current working directory
+prompt_dir() {
+  local dir_limit="3"
+  local truncation="⋯"
+  local first_char
+  local part_count=0
+  local formatted_cwd=""
+  local dir_sep="  "
+  local tilde="~"
+  local cwd="${PWD/#$HOME/$tilde}"
+
+  first_char=$cwd[1,1]
+  cwd="${cwd#\~}"
+  while [[ "$cwd" == */* && "$cwd" != "/" ]]; do
+    # pop off last part of cwd
+    local part="${cwd##*/}"
+    cwd="${cwd%/*}"
+    [[ -z $formatted_cwd ]] && formatted_cwd="%b$dir_sep%B$part" || formatted_cwd="%b$dir_sep$part$formatted_cwd"
+    part_count=$((part_count+1))
+    [[ $part_count -eq $dir_limit ]] && first_char="$truncation" && break
+  done
+
+  prompt_segment "$COLORS[1]" "$COLORS[3]" "%B$first_char$formatted_cwd%b"
+}
+
+# Status:
+# - was there an error
+# - am I root
+# - are there background jobs?
+prompt_status() {
+  local symbols
+  local jobs
+  jobs=$(jobs -l | wc -l)
+  symbols=()
+  [[ $RETVAL -ne 0 ]] && symbols+="%{%F{red}%}✘ %{%F{235}%}${RETVAL}"
+  [[ $UID -eq 0 ]] && symbols+="%{%F{yellow}%}⚡"
+  [[ $jobs -gt 0 ]] && symbols+="%{%F{blue}%}⚙ %{%F{235}%}${jobs}"
+  [[ -n "$symbols" ]] && prompt_segment $1 136 default "$symbols"
+}
+
+prompt_time() {
+  prompt_segment $1 "$COLORS[1]" "$COLORS[3]" "%* "
+}
+
+function prompt_xerx_precmd {
+#  unsetopt XTRACE KSH_ARRAYS
+    autoload -Uz git-info
+    if (( $+functions[git-info] )); then
+      git-info
+    fi
+    autoload -Uz vcs_info
+    if (( $+functions[vcs_info] )); then
+      vcs_info
+    fi
+#
+#  if (( $+functions[python-info] )); then
+#    python-info
+#  fi
+#
+#  # Get ruby information
+#  if (( $+functions[ruby-info] )); then
+#    ruby-info
+#  fi
+}
+
+## Main prompt
+prompt_xerx_main() {
+  prompt_host
+  prompt_user
+  prompt_dir
+  prompt_end
+}
+
+rprompt_xerx_main() {
+  RETVAL=$?
+  prompt_status r
+# prompt_vcs r
+  prompt_git r
+  prompt_time r
+}
+
+function prompt_xerx_setup {
+  #setopt LOCAL_OPTIONS
+  #unsetopt XTRACE KSH_ARRAYS
+  prompt_opts=(cr percent subst)
+
+  add-zsh-hook precmd prompt_xerx_precmd
+
+  setopt prompt_subst
+#  autoload -Uz vcs_info
+#  zstyle ':vcs_info:*' enable git
+#  zstyle ':vcs_info:*' get-revision true
+#  zstyle ':vcs_info:*' check-for-changes true
+#  zstyle ':vcs_info:*' check-for-staged-changes true
+#  zstyle ':vcs_info:*' stagedstr '+'
+#  zstyle ':vcs_info:git:*' unstagedstr '%F{red}%f'
+#  zstyle ':vcs_info:git:*' formats '%u%c%b%m'
+#  zstyle ':vcs_info:*' actionformats '(%a: %u%c%b%)'
+#  zstyle ':vcs_info:git*+set-message:*' hooks git-st
+
+  zstyle ':prezto:module:git:info' verbose 'yes'
+  zstyle ':prezto:module:git:info:action' format '%B%s%b: '
+  zstyle ':prezto:module:git:info:branch' format '%b '
+#  zstyle ':prezto:module:git:info:remote' format '%R/ '
+  zstyle ':prezto:module:git:info:remote' format ''
+  zstyle ':prezto:module:git:info:ahead' format '↑%A'
+  zstyle ':prezto:module:git:info:behind' format '↓%B'
+  zstyle ':prezto:module:git:info:stashed' format '☰ %S '
+  zstyle ':prezto:module:git:info:dirty' format ' %D '
+  zstyle ':prezto:module:git:info:keys' format 'prompt'  '%s%D%R%b%A%B%S' 
+  PROMPT='%{%f%b%k%}$(prompt_xerx_main) '
+  RPROMPT='%{%f%b%k%}$(rprompt_xerx_main)'
+}
+
+prompt_xerx_setup "$@"
+
+

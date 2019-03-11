@@ -16,7 +16,8 @@ endif
 
 " Default to filename searches - so that appctrl will find application
 " controller
-let g:ctrlp_by_filename = 1
+" Damon: don't do this
+let g:ctrlp_by_filename = 0
 
 " Don't jump to already open window. This is annoying if you are maintaining
 " several Tab workspaces and want to open two windows into the same file.
@@ -54,4 +55,5 @@ map ,jT :CtrlP test<CR>
 
 "Cmd-Shift-(M)ethod - jump to a method (tag in current file)
 "Ctrl-m is not good - it overrides behavior of Enter
-nnoremap <silent> <D-M> :CtrlPBufTag<CR>
+nnoremap <silent> ,M :CtrlPBufTag<CR>
+nnoremap <silent> ,< :CtrlPTag<CR>
